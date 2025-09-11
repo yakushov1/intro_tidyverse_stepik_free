@@ -1,5 +1,6 @@
 library(tidyverse)
 library(readxl)
+
 length(system.file(package='readxl'))>0
 
 
@@ -109,6 +110,174 @@ weather_stations |>
   filter((Station == 21982 & Year %in% c(1967:1990) & Month %in% c(6,7,8) & Tmin>-4) |
         (Station == 28440 & Year <=1970 & Month <=6)) |> 
   arrange(Tavg)
+
+
+
+# 2.3.2. ------------------------------------------------------------------
+
+sochi <- read_excel('input/01_import_sochi.xls')
+
+sochi_selected <- sochi |> 
+  select(1:4, 13) |> 
+  filter(T > 15 & T < 22 & P<764) |> 
+  arrange(desc(Td))
+
+summary(sochi_selected)
+
+
+# 2.3.3. ------------------------------------------------------------------
+
+sochi |> 
+  select(Ff, ff10) |> 
+  filter(is.na(ff10)==F & Ff>ff10)
+
+
+# 2.3.4. ------------------------------------------------------------------
+
+sochi |>
+  select(where(is.character))
+
+# 2.3.5. ------------------------------------------------------------------
+
+sochi |> 
+  select(Local_time=1) |> 
+  arrange(Local_time)
+
+# 2.3.6. ------------------------------------------------------------------
+
+sochi |> 
+  rename(Local_time = 1)
+
+# 2.3.8. ------------------------------------------------------------------
+min((sochi |> 
+  mutate(P_diff = P-P0))$P_diff)
+
+
+# 2.3.10 ------------------------------------------------------------------
+sochi <- read_excel('input/01_import_sochi.xls')
+a <- sochi |> 
+  mutate(P_diff = P - P0,
+         T_sqr = T**2,
+         Wind = length(WW),
+         .before = 1) |> 
+  rename(Local_time = 4)
+
+max(a[1])
+
+
+# 2.3.12. -----------------------------------------------------------------
+a |> 
+  mutate(Local_time = as_datetime(Local_time, format = "%d.%m.%Y %R")) |> 
+  arrange(Local_time)
+
+
+# 2.3.14 ------------------------------------------------------------------
+
+max((sochi |> 
+  relocate(where(is.numeric), .after = DD))[6])
+
+
+# 2.4.1 -------------------------------------------------------------------
+
+climatic_data <- read_table('input/02_example.txt', col_names = c("Station", "Year", 
+                                                                  "Month", "Day", "Tmin",
+                                                                  "Tavg", "Tmax", "Pr"))
+
+# 2.4.2. ------------------------------------------------------------------
+
+climatic_data |> 
+  group_by(Station) |> 
+  summarise(Pr_avg = mean(Pr))
+
+
+# 2.4.3. ------------------------------------------------------------------
+climatic_data |> 
+  group_by(Station) |> 
+  summarise(Pr_avg = mean(Pr, na.rm = T)) |> 
+  filter(Station == 34880)
+
+
+# 2.4.4. ------------------------------------------------------------------
+
+climatic_data |> 
+  group_by(Year) |> 
+  summarise(Tmin = mean(Tmin, na.rm = T),
+            Tmax = max(Tmax, na.rm = T),
+            Pr = sum(Pr, na.rm = T)) |> 
+  arrange(desc(Pr))
+
+
+# 2.4.5. ------------------------------------------------------------------
+
+climatic_data |> 
+  group_by(Station, Month) |> 
+  summarise(Tmin = mean(Tmin, na.rm = T)) |> 
+  arrange(desc(Tmin))
+
+
+# 2.4.6. ------------------------------------------------------------------
+
+climatic_data |> 
+  group_by(Month) |> 
+  summarise(Tmin = round(mean(Tmin, na.rm = T), 2))
+
+
+# 2.4.7. ------------------------------------------------------------------
+climatic_data |> 
+  group_by(Station) |> 
+  summarise(Pr = sum(Pr, na.rm = T)) |> 
+  slice_max(Pr, n = 5)
+
+
+# 2.4.8. ------------------------------------------------------------------
+# без ungroup
+climatic_data |> 
+  group_by(Station, Month) |> 
+  summarise(Tavg_max = max(Tavg, na.rm = T),
+            Tavg_min = min(Tavg, na.rm = T)) |> 
+  mutate(Tdiff = Tavg_max - Tavg_min) |> 
+  filter(Month == 7) |> 
+  arrange(desc(Tdiff))
+
+# с ungroup
+climatic_data |> 
+  group_by(Station, Month) |> 
+  summarise(Tavg_max = max(Tavg, na.rm = T),
+            Tavg_min = min(Tavg, na.rm = T)) |> 
+  mutate(Tdiff = Tavg_max - Tavg_min) |> 
+  filter(Month == 7) |> 
+  ungroup() |> 
+  slice_max(Tdiff, n = 3)
+
+# 2.4.10 ------------------------------------------------------------------
+climatic_data |> 
+  filter(Station == 21982) |> 
+  mutate(Pr_filled = case_when(is.na(Pr) == T ~ median(Pr, na.rm = T), .default = Pr),
+         Tavg_filled = case_when(is.na(Tavg) == T~ median(Tavg, na.rm = T), .default = Tavg)) |> 
+  summarise(Tavg_mean = mean(Tavg, na.rm = T), 
+            Pr_mean = mean(Pr, na.rm = T),
+            Tavg_filled_mean = mean(Tavg_filled),
+            Pr_filled_mean = mean(Pr_filled)) |> 
+  mutate(Tavg_diff = round(Tavg_mean - Tavg_filled_mean, 2),
+         Pr_diff = round(Pr_mean - Pr_filled_mean, 2))\
+
+
+# 2.4.11. -----------------------------------------------------------------
+
+Работайте с исходной таблицей. Учитывая различия между станциями, годами и месяцами, 
+если минимальные  температуры превышают значения максимальных в тот же день, 
+замените Tmin  на mean(Tmin, na.rm = T) (предварительно не забудьте выполнить соответствующую группировку). 
+В противоположных ситуациях оставьте Tmin без изменений (вспомните про доп.аргументы case_when) 
+Результат сохраните в новый столбец Tmin_new. Затем вычислите разницу между столбцами 
+T_diff = Tmin-Tmin_new, а в ответе укажите сумму всех значений T_diff (удалите пропуски), 
+округленную до целого значения (не забудьте отменить группировку). 
+
+climatic_data |> 
+  group_by(Station, Year, Month) |> 
+  mutate(Tmin_new = case_when(Tmin>Tmax ~ mean(Tmin, na.rm = T), .default = Tmin)) |> 
+  mutate(T_diff = Tmin-Tmin_new) |> 
+  ungroup() |> 
+  summarise(T_diff_sum = round(sum(T_diff, na.rm = T)))
 
 
 
