@@ -264,14 +264,6 @@ climatic_data |>
 
 # 2.4.11. -----------------------------------------------------------------
 
-Работайте с исходной таблицей. Учитывая различия между станциями, годами и месяцами, 
-если минимальные  температуры превышают значения максимальных в тот же день, 
-замените Tmin  на mean(Tmin, na.rm = T) (предварительно не забудьте выполнить соответствующую группировку). 
-В противоположных ситуациях оставьте Tmin без изменений (вспомните про доп.аргументы case_when) 
-Результат сохраните в новый столбец Tmin_new. Затем вычислите разницу между столбцами 
-T_diff = Tmin-Tmin_new, а в ответе укажите сумму всех значений T_diff (удалите пропуски), 
-округленную до целого значения (не забудьте отменить группировку). 
-
 climatic_data |> 
   group_by(Station, Year, Month) |> 
   mutate(Tmin_new = case_when(Tmin>Tmax ~ mean(Tmin, na.rm = T), .default = Tmin)) |> 
@@ -280,5 +272,162 @@ climatic_data |>
   summarise(T_diff_sum = round(sum(T_diff, na.rm = T)))
 
 
+# 2.5.2. ------------------------------------------------------------------
+annual_temp <- climatic_data |> 
+  group_by(Station, Year) |> 
+  summarise(Tavg = mean(Tavg, na.rm = T))
+
+annual_temp |> 
+  filter(Year == 1969) |> 
+  arrange(desc(Tavg))
 
 
+# 2.5.3. ------------------------------------------------------------------
+annual_temp |> 
+  pivot_wider(id_cols = Year, names_from = Station, values_from = Tavg) |> 
+  summarise(mean(21982))
+
+
+# 2.5.4. ------------------------------------------------------------------
+
+"St_21982"
+
+
+# 2.5.5. ------------------------------------------------------------------
+
+climatic_data |> 
+  filter(Station == 21982) |> 
+  group_by(Year, Month) |> 
+  summarise(Pr_sum = sum(Pr)) |> 
+  pivot_wider(id_cols = Year, names_from = Month, values_from = Pr_sum)
+
+
+
+# 2.5.6. ------------------------------------------------------------------
+climatic_data |>
+  filter(Station ==  22028) |>
+  group_by(Year, Month) |>
+  summarise(Tavg_median= median(Tavg)) |>
+  pivot_wider(id_cols = Year,
+              names_from = Month,
+              values_from = Tavg_median,
+              names_prefix = "M_") |>
+  ungroup() |>
+  summarise(N = mean(M_10, na.rm = T))
+
+
+# 2.5.7. ------------------------------------------------------------------
+
+sochi <- read_excel("input/01_import_sochi.xls") |>
+  select(1:4) |>
+  rename(Local_time = 1) |>
+  mutate(Local_time = as_datetime(Local_time, format = "%d.%m.%Y %R"))
+
+
+# 2.5.8. ------------------------------------------------------------------
+
+sochi <- read_excel("input/01_import_sochi.xls") |>
+  select(1:4) |>
+  rename(Local_time = 1) |>
+  mutate(Local_time = as_datetime(Local_time, format = "%d.%m.%Y %R")) |> 
+  mutate(Y = year(Local_time),
+         M = month(Local_time),
+         D = mday(Local_time)) |> 
+  select(-Local_time) |> 
+  group_by(Y, M) |> 
+  summarise(T = mean(T),
+            P0 = mean(P0),
+            P = mean(P))
+
+
+# 2.5.10 ------------------------------------------------------------------
+sochi <- read_excel("input/01_import_sochi.xls") |> 
+  select(1:4) |> 
+  rename(Local_time = 1) |> 
+  mutate(Local_time = as_datetime(Local_time, format = "%d.%m.%Y %R")) |> 
+  mutate(Y = year(Local_time),
+         M = month(Local_time),
+         D = mday(Local_time)) |> 
+  select(-Local_time) |> 
+  group_by(Y) |> 
+  summarise(T = min(T),
+            P0 = min(P0),
+            P = min(P)) |> 
+  pivot_longer(cols = !Y, names_to = 'Parametr', values_to ='Val')
+  
+
+
+# 2.5.11 ------------------------------------------------------------------
+round(min(sochi$Val),2)
+
+
+
+# 2.6.2. ------------------------------------------------------------------
+
+temperature <- read_excel("input/dplyr_join/23776_TTTR.xlsx") |>
+  select(Y = "год", M = "месяц", D = "день", Tavg = "Тср", Pr = "осадки") |>
+  group_by(Y, M) |>
+  summarise(
+    Tavg = mean(Tavg, na.rm = T),
+    Pr_avg = mean(Pr, na.rm = T)
+  )
+
+
+# 2.6.3. ------------------------------------------------------------------
+
+snow <- read_csv2("input/dplyr_join/23776__snow.csv") |>
+  select(Y = "Год", M = "Месяц", D = "День", Sn_depth = "Высота_снежного_покрова") |>
+  group_by(Y, M) |>
+  summarise(Sn_depth_avg = mean(Sn_depth, na.rm = T))
+
+
+
+# 2.6.4. ------------------------------------------------------------------
+climatic_data <- temperature |>
+  left_join(snow, by = c("Y", "M"))
+
+nrow(climatic_data) - nrow(snow)
+
+
+# 2.6.5. ------------------------------------------------------------------
+
+summary(climatic_data)
+
+
+# 2.6.6. ------------------------------------------------------------------
+climatic_data <- temperature |>
+  right_join(snow, by = c("Y", "M"))
+
+summary(climatic_data)
+
+# 2.6.8. ------------------------------------------------------------------
+
+full_join_test <- temperature |>
+  full_join(snow, by = c("Y", "M"))
+
+summary(full_join_test)
+
+
+
+# 2.6.9. ------------------------------------------------------------------
+snow <- read_csv2('input/dplyr_join/23776__snow.csv') |> 
+  select(Y = 'Год',
+         Snow_depth = Высота_снежного_покрова) |> 
+  group_by(Y) |> 
+  summarise(Sn_depth = mean(Snow_depth, na.rm = T))
+
+
+temp <-  read_excel('input/dplyr_join/23776_TTTR.xlsx') |> 
+  select(Y = "год", M = "месяц", D = "день", Tavg = "Тср", Pr = "осадки") |>
+  group_by(Y) |>
+  summarise(
+    Tavg = mean(Tavg, na.rm = T),
+    Pr_avg = mean(Pr, na.rm = T)
+  )
+
+total <- snow |> 
+  full_join(temp, by = 'Y') |> 
+  filter(Tavg < 0 & Sn_depth>5 & Pr_avg <15) |> 
+  slice_max(Tavg, n = 5) |> 
+  mutate(Sum = Tavg + Sn_depth + Pr_avg) |> 
+  summarise(round(median(Sum)))
